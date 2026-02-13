@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <link rel="stylesheet" type="text/css" href="splash/splash.css" />
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, height=device-height, user-scalable=0"
+    />
+    <title>r/edact</title>
+  </head>
+  <body class="app">
+    <div class="document">
+      <!-- Decorative redaction bars -->
+      <div class="redact-bar bar-1"></div>
+      <div class="redact-bar bar-2"></div>
+
+      <!-- Classified stamp -->
+      <div class="classified-stamp">CLASSIFIED</div>
+
+      <!-- Main content -->
+      <div class="content">
+        <h1 class="logo">r/<span class="redacted">edact</span></h1>
+        <p class="tagline">Guess the <span class="inline-redact">subreddit</span></p>
+
+        <div class="description">
+          <p class="hint">5 guesses. 4 clues. 1 answer.</p>
+        </div>
+      </div>
+
+      <button class="play-button" id="start-button">
+        <span class="button-text">DECLASSIFY</span>
+      </button>
+
+      <div class="redact-bar bar-3"></div>
+    </div>
+
+    <script type="module" src="splash/splash.ts" defer></script>
+  </body>
+</html>

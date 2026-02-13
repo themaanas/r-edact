@@ -1,0 +1,54 @@
+name: Generate Daily Puzzle
+
+on:
+  schedule:
+    # Runs at 00:00 UTC every day
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  generate-puzzle:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate puzzle
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python reddit_post_guess.py
+
+      - name: Upload puzzle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-${{ github.run_id }}
+          path: puzzle.json
+          retention-days: 30
+
+      - name: Commit puzzle to repo
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          # Create puzzles directory if it doesn't exist
+          mkdir -p puzzles
+
+          # Copy puzzle with date in filename
+          DATE=$(date +%Y-%m-%d)
+          cp puzzle.json "puzzles/${DATE}.json"
+
+          # Also keep latest.json for easy access
+          cp puzzle.json puzzles/latest.json
+
+          git add puzzles/
+          git commit -m "Add puzzle for ${DATE}" || echo "No changes to commit"
+          git push

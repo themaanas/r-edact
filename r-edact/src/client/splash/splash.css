@@ -1,0 +1,220 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+}
+
+:root {
+  --bg-dark: #0e1113;
+  --bg-document: #1a1a1b;
+  --text-primary: #d7dadc;
+  --text-secondary: #818384;
+  --accent: #ff4500;
+  --redact-black: #000000;
+  --border: #343536;
+}
+
+body {
+  background-color: var(--bg-dark);
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 24px;
+  position: relative;
+}
+
+/* Document container */
+.document {
+  background: var(--bg-document);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px 24px;
+  max-width: 360px;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Decorative redaction bars */
+.redact-bar {
+  position: absolute;
+  background: var(--redact-black);
+  border-radius: 2px;
+}
+
+.bar-1 {
+  top: 20px;
+  right: 20px;
+  width: 80px;
+  height: 12px;
+  opacity: 0.6;
+}
+
+.bar-2 {
+  top: 40px;
+  right: 40px;
+  width: 50px;
+  height: 10px;
+  opacity: 0.4;
+}
+
+.bar-3 {
+  bottom: 100px;
+  left: 20px;
+  width: 60px;
+  height: 10px;
+  opacity: 0.3;
+}
+
+/* Classified stamp */
+.classified-stamp {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--accent);
+  border: 2px solid var(--accent);
+  padding: 4px 8px;
+  border-radius: 4px;
+  transform: rotate(-5deg);
+  opacity: 0.8;
+}
+
+/* Main content */
+.content {
+  text-align: center;
+  margin: 40px 0 32px;
+}
+
+.logo {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  letter-spacing: -1px;
+}
+
+.logo .redacted {
+  position: relative;
+  color: var(--text-primary);
+}
+
+.logo .redacted::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: 50%;
+  height: 70%;
+  transform: translateY(-50%);
+  background: var(--accent);
+  border-radius: 3px;
+  z-index: -1;
+}
+
+.tagline {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.inline-redact {
+  background: var(--redact-black);
+  color: var(--redact-black);
+  padding: 2px 8px;
+  border-radius: 3px;
+  margin: 0 2px;
+  transition: all 0.3s ease;
+}
+
+.inline-redact:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.description {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.8;
+}
+
+.description p {
+  margin: 4px 0;
+}
+
+.hint {
+  margin-top: 16px !important;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.85rem !important;
+  letter-spacing: 0.5px;
+}
+
+/* Play button */
+.play-button {
+  display: block;
+  width: 100%;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 16px 24px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.play-button:hover {
+  background: #ff5722;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 69, 0, 0.4);
+}
+
+.play-button:active {
+  transform: translateY(0);
+}
+
+.button-text {
+  position: relative;
+  z-index: 1;
+}
+
+/* Footer */
+.footer {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.footer-text {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Animations */
+@keyframes flicker {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.6; }
+}
+
+.classified-stamp {
+  animation: flicker 3s ease-in-out infinite;
+}
