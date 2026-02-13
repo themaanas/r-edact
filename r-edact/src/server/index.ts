@@ -51,57 +51,30 @@ function getRevealedClues(clues: Clues, guessCount: number): Partial<Clues> {
   return revealed;
 }
 
-async function getPuzzleNumber(): Promise<number> {
-  const num = await redis.get("puzzle:number");
-  return num ? parseInt(num) : 1;
-}
-
 async function incrementPuzzleNumber(): Promise<number> {
   return await redis.incrBy("puzzle:number", 1);
 }
 
-// GitHub puzzle source
-const PUZZLE_URL = "https://raw.githubusercontent.com/themaanas/r-edact/main/puzzles/latest.json";
+// Fetch today's puzzle from GitHub (always fresh, no Redis cache)
+async function fetchTodaysPuzzle(): Promise<Puzzle | null> {
+  const today = getTodayDate();
+  const url = `https://raw.githubusercontent.com/themaanas/r-edact/main/puzzles/${today}.json`;
 
-// Fetch puzzle from GitHub
-async function fetchPuzzleFromGitHub(): Promise<Puzzle | null> {
   try {
-    console.log(`Fetching puzzle from: ${PUZZLE_URL}`);
-    const response = await fetch(PUZZLE_URL);
+    console.log(`Fetching puzzle from: ${url}`);
+    const response = await fetch(url);
     if (response.ok) {
-      const data = await response.json();
-      console.log("Successfully fetched puzzle from GitHub");
-      return data as Puzzle;
+      const puzzle = await response.json() as Puzzle;
+      // Assign puzzle number if not present
+      if (!puzzle.puzzleNumber) {
+        puzzle.puzzleNumber = await incrementPuzzleNumber();
+      }
+      return puzzle;
     }
+    console.log(`No puzzle found for ${today}`);
   } catch (error) {
     console.log("Failed to fetch puzzle:", error);
   }
-  return null;
-}
-
-// Load puzzle for today - check Redis first, then fetch from GitHub
-async function loadTodaysPuzzle(): Promise<Puzzle | null> {
-  const today = getTodayDate();
-  const puzzleKey = `puzzle:${today}`;
-
-  // Check Redis cache first
-  const cached = await redis.get(puzzleKey);
-  if (cached) {
-    return JSON.parse(cached) as Puzzle;
-  }
-
-  // Fetch from GitHub
-  const puzzle = await fetchPuzzleFromGitHub();
-  if (puzzle) {
-    // Assign puzzle number if not present
-    if (!puzzle.puzzleNumber) {
-      puzzle.puzzleNumber = await incrementPuzzleNumber();
-    }
-    await redis.set(puzzleKey, JSON.stringify(puzzle));
-    console.log(`Cached puzzle #${puzzle.puzzleNumber} for ${today}`);
-    return puzzle;
-  }
-
   return null;
 }
 
@@ -115,9 +88,6 @@ router.get<object, InitResponse | ErrorResponse>("/api/init", async (_req, res):
   }
 
   try {
-    // Load puzzle (from Redis, GitHub, or fallback)
-    await loadTodaysPuzzle();
-
     const username = await reddit.getCurrentUsername();
     res.json({
       type: "init",
@@ -130,7 +100,7 @@ router.get<object, InitResponse | ErrorResponse>("/api/init", async (_req, res):
   }
 });
 
-// GET /api/puzzle - Get today's puzzle with current game state
+// GET /api/puzzle - Get today's puzzle from GitHub + game state from Redis
 router.get<object, PuzzleResponse | ErrorResponse>("/api/puzzle", async (_req, res): Promise<void> => {
   try {
     const userId = context.userId;
@@ -139,23 +109,16 @@ router.get<object, PuzzleResponse | ErrorResponse>("/api/puzzle", async (_req, r
       return;
     }
 
-    // Load puzzle (from Redis, GitHub, or fallback)
-    await loadTodaysPuzzle();
-
-    const today = getTodayDate();
-    const puzzleKey = `puzzle:${today}`;
-    const gameStateKey = `user:${userId}:game:${today}`;
-
-    // Get puzzle
-    const puzzleData = await redis.get(puzzleKey);
-    if (!puzzleData) {
+    // Fetch puzzle from GitHub (always fresh)
+    const puzzle = await fetchTodaysPuzzle();
+    if (!puzzle) {
       res.status(404).json({ type: "error", message: "No puzzle available for today" });
       return;
     }
 
-    const puzzle: Puzzle = JSON.parse(puzzleData);
-
-    // Get or create game state
+    // Get or create game state from Redis
+    const today = getTodayDate();
+    const gameStateKey = `user:${userId}:game:${today}`;
     let gameStateData = await redis.get(gameStateKey);
     let gameState: GameState;
 
@@ -174,7 +137,7 @@ router.get<object, PuzzleResponse | ErrorResponse>("/api/puzzle", async (_req, r
     const response: PuzzleResponse = {
       type: "puzzle",
       postTitle: puzzle.postTitle,
-      postBody: puzzle.postBody,
+      postBody: puzzle.postBody || "",
       puzzleNumber: puzzle.puzzleNumber,
       revealedClues: getRevealedClues(puzzle.clues, gameState.guesses.length),
       gameState,
@@ -208,19 +171,16 @@ router.post<object, GuessResponse | ErrorResponse, { guess: string }>("/api/gues
     }
 
     const today = getTodayDate();
-    const puzzleKey = `puzzle:${today}`;
     const gameStateKey = `user:${userId}:game:${today}`;
     const statsKey = `user:${userId}:stats`;
     const leaderboardKey = `leaderboard:${today}`;
 
-    // Get puzzle
-    const puzzleData = await redis.get(puzzleKey);
-    if (!puzzleData) {
+    // Get puzzle from GitHub
+    const puzzle = await fetchTodaysPuzzle();
+    if (!puzzle) {
       res.status(404).json({ type: "error", message: "No puzzle available" });
       return;
     }
-
-    const puzzle: Puzzle = JSON.parse(puzzleData);
 
     // Get game state
     let gameStateData = await redis.get(gameStateKey);
@@ -443,7 +403,7 @@ router.post<object, SetPuzzleResponse | ErrorResponse, SetPuzzleRequest>("/api/a
   }
 });
 
-// POST /api/reset - Reset everything for testing (clears puzzle cache + game state)
+// POST /api/reset - Reset game state for testing
 router.post<object, { success: boolean } | ErrorResponse>("/api/reset", async (_req, res): Promise<void> => {
   try {
     const userId = context.userId;
@@ -453,11 +413,8 @@ router.post<object, { success: boolean } | ErrorResponse>("/api/reset", async (_
     }
 
     const today = getTodayDate();
-    const puzzleKey = `puzzle:${today}`;
     const gameStateKey = `user:${userId}:game:${today}`;
 
-    // Clear both puzzle cache and game state
-    await redis.del(puzzleKey);
     await redis.del(gameStateKey);
 
     res.json({ success: true });
