@@ -4,7 +4,8 @@
       "Bash(npm run build:*)",
       "Bash(git init:*)",
       "Bash(npm run deploy:*)",
-      "Bash(npx devvit install edact)"
+      "Bash(npx devvit install edact)",
+      "Bash(git add:*)"
     ]
   }
 }

@@ -60,29 +60,74 @@ async function incrementPuzzleNumber(): Promise<number> {
   return await redis.incrBy("puzzle:number", 1);
 }
 
-// Seed a test puzzle if none exists for today
-async function seedTestPuzzle() {
+// GitHub repo config for fetching puzzles
+const GITHUB_REPO = "themaanas/r-edact";
+const GITHUB_BRANCH = "main";
+
+// Fetch puzzle from GitHub
+async function fetchPuzzleFromGitHub(date: string): Promise<Puzzle | null> {
+  const urls = [
+    `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/puzzles/${date}.json`,
+    `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/puzzles/latest.json`,
+  ];
+
+  for (const url of urls) {
+    try {
+      console.log(`Fetching puzzle from: ${url}`);
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`Successfully fetched puzzle from ${url}`);
+        return data as Puzzle;
+      }
+    } catch (error) {
+      console.log(`Failed to fetch from ${url}:`, error);
+    }
+  }
+
+  return null;
+}
+
+// Load puzzle for today - try Redis first, then GitHub
+async function loadTodaysPuzzle(): Promise<boolean> {
   const today = getTodayDate();
   const puzzleKey = `puzzle:${today}`;
 
+  // Check if puzzle already exists in Redis
   const existing = await redis.get(puzzleKey);
-  if (!existing) {
-    const puzzleNumber = await incrementPuzzleNumber();
-    const testPuzzle: Puzzle = {
-      postTitle: "TIFU by mass-emailing my entire company asking if anyone lost a cat",
-      postBody: "So I work at a big tech company with about 5000 employees. Yesterday I found a cat outside our office building and decided to be a good samaritan...",
-      correctSubreddit: "tifu",
-      clues: {
-        upvoteRatio: "94% upvoted",
-        topComment: "\"Please tell me you hit reply-all on accident and not on purpose\"",
-        communityStats: "19.2M members, founded 2012",
-        sidebarRule: "Rule 2: Posts must be about you",
-      },
-      puzzleNumber,
-    };
-    await redis.set(puzzleKey, JSON.stringify(testPuzzle));
-    console.log(`Seeded test puzzle #${puzzleNumber} for ${today}`);
+  if (existing) {
+    return true;
   }
+
+  // Try to fetch from GitHub
+  const githubPuzzle = await fetchPuzzleFromGitHub(today);
+  if (githubPuzzle) {
+    // Assign puzzle number if not present
+    if (!githubPuzzle.puzzleNumber) {
+      githubPuzzle.puzzleNumber = await incrementPuzzleNumber();
+    }
+    await redis.set(puzzleKey, JSON.stringify(githubPuzzle));
+    console.log(`Loaded puzzle #${githubPuzzle.puzzleNumber} from GitHub for ${today}`);
+    return true;
+  }
+
+  // Fallback: seed a default test puzzle
+  const puzzleNumber = await incrementPuzzleNumber();
+  const fallbackPuzzle: Puzzle = {
+    postTitle: "TIFU by mass-emailing my entire company asking if anyone lost a cat",
+    postBody: "So I work at a big tech company with about 5000 employees. Yesterday I found a cat outside our office building and decided to be a good samaritan...",
+    correctSubreddit: "tifu",
+    clues: {
+      upvoteRatio: "94% upvoted",
+      topComment: "\"Please tell me you hit reply-all on accident and not on purpose\"",
+      communityStats: "19.2M members, founded 2012",
+      sidebarRule: "Rule 2: Posts must be about you",
+    },
+    puzzleNumber,
+  };
+  await redis.set(puzzleKey, JSON.stringify(fallbackPuzzle));
+  console.log(`Seeded fallback puzzle #${puzzleNumber} for ${today}`);
+  return true;
 }
 
 // GET /api/init - Initialize game session
@@ -95,8 +140,8 @@ router.get<object, InitResponse | ErrorResponse>("/api/init", async (_req, res):
   }
 
   try {
-    // Seed test puzzle if none exists
-    await seedTestPuzzle();
+    // Load puzzle (from Redis, GitHub, or fallback)
+    await loadTodaysPuzzle();
 
     const username = await reddit.getCurrentUsername();
     res.json({
@@ -119,8 +164,8 @@ router.get<object, PuzzleResponse | ErrorResponse>("/api/puzzle", async (_req, r
       return;
     }
 
-    // Seed test puzzle if none exists
-    await seedTestPuzzle();
+    // Load puzzle (from Redis, GitHub, or fallback)
+    await loadTodaysPuzzle();
 
     const today = getTodayDate();
     const puzzleKey = `puzzle:${today}`;
@@ -441,6 +486,32 @@ router.post<object, { success: boolean } | ErrorResponse>("/api/reset", async (_
   } catch (error) {
     console.error("Reset error:", error);
     res.status(500).json({ type: "error", message: "Failed to reset game" });
+  }
+});
+
+// POST /api/admin/refresh-puzzle - Force refresh puzzle from GitHub
+router.post<object, { success: boolean; message: string } | ErrorResponse>("/api/admin/refresh-puzzle", async (_req, res): Promise<void> => {
+  try {
+    const today = getTodayDate();
+    const puzzleKey = `puzzle:${today}`;
+
+    // Delete existing puzzle
+    await redis.del(puzzleKey);
+
+    // Fetch fresh from GitHub
+    const githubPuzzle = await fetchPuzzleFromGitHub(today);
+    if (githubPuzzle) {
+      if (!githubPuzzle.puzzleNumber) {
+        githubPuzzle.puzzleNumber = await incrementPuzzleNumber();
+      }
+      await redis.set(puzzleKey, JSON.stringify(githubPuzzle));
+      res.json({ success: true, message: `Refreshed puzzle from GitHub for ${today}` });
+    } else {
+      res.status(404).json({ type: "error", message: "No puzzle found on GitHub" });
+    }
+  } catch (error) {
+    console.error("Refresh puzzle error:", error);
+    res.status(500).json({ type: "error", message: "Failed to refresh puzzle" });
   }
 });
 
