@@ -403,27 +403,6 @@ router.post<object, SetPuzzleResponse | ErrorResponse, SetPuzzleRequest>("/api/a
   }
 });
 
-// POST /api/reset - Reset game state for testing
-router.post<object, { success: boolean } | ErrorResponse>("/api/reset", async (_req, res): Promise<void> => {
-  try {
-    const userId = context.userId;
-    if (!userId) {
-      res.status(401).json({ type: "error", message: "User not authenticated" });
-      return;
-    }
-
-    const today = getTodayDate();
-    const gameStateKey = `user:${userId}:game:${today}`;
-
-    await redis.del(gameStateKey);
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error("Reset error:", error);
-    res.status(500).json({ type: "error", message: "Failed to reset" });
-  }
-});
-
 // Keep existing post creation endpoints
 router.post("/internal/on-app-install", async (_req, res): Promise<void> => {
   try {

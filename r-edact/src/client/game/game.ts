@@ -533,28 +533,5 @@ function setupEventListeners() {
   });
 }
 
-// Triple-click puzzle number to reset (clears puzzle cache + game state, re-fetches from GitHub)
-let resetClickCount = 0;
-let resetClickTimer: number | null = null;
-
-puzzleNumberEl.addEventListener("click", async () => {
-  resetClickCount++;
-  if (resetClickTimer) clearTimeout(resetClickTimer);
-
-  if (resetClickCount >= 3) {
-    resetClickCount = 0;
-    try {
-      await fetch("/api/reset", { method: "POST" });
-      window.location.reload();
-    } catch (error) {
-      console.error("Reset error:", error);
-    }
-  } else {
-    resetClickTimer = window.setTimeout(() => {
-      resetClickCount = 0;
-    }, 500);
-  }
-});
-
 // Start the game
 init();
