@@ -533,36 +533,19 @@ function setupEventListeners() {
   });
 }
 
-// Reset game for testing - triple click puzzle number to reset game state
-// 5 clicks = refresh puzzle from GitHub + reset game state
+// Triple-click puzzle number to reset (clears puzzle cache + game state, re-fetches from GitHub)
 let resetClickCount = 0;
 let resetClickTimer: number | null = null;
 
 puzzleNumberEl.addEventListener("click", async () => {
   resetClickCount++;
+  if (resetClickTimer) clearTimeout(resetClickTimer);
 
-  if (resetClickTimer) {
-    clearTimeout(resetClickTimer);
-  }
-
-  if (resetClickCount >= 5) {
-    // 5 clicks: refresh puzzle from GitHub AND reset game state
+  if (resetClickCount >= 3) {
     resetClickCount = 0;
     try {
-      await fetch("/api/admin/refresh-puzzle", { method: "POST" });
       await fetch("/api/reset", { method: "POST" });
       window.location.reload();
-    } catch (error) {
-      console.error("Refresh error:", error);
-    }
-  } else if (resetClickCount >= 3) {
-    // 3 clicks: just reset game state
-    resetClickCount = 0;
-    try {
-      const response = await fetch("/api/reset", { method: "POST" });
-      if (response.ok) {
-        window.location.reload();
-      }
     } catch (error) {
       console.error("Reset error:", error);
     }
